@@ -9,11 +9,13 @@ import FarmMap from "./pages/FarmMap";
 import Farmers from "./pages/Farmers";
 import Notifications from "./pages/Notifications";
 import Settings from "./pages/Settings";
+import Live from "./pages/Live";
 import api, { logout } from "./services/api";
 
 const pageTitles = {
   "/":              "Dashboard",
   "/detections":    "UAV Detections",
+  "/live":          "Live Drone Feed",
   "/map":           "Farm Map",
   "/farmers":       "Farmers",
   "/notifications": "Notifications",
@@ -33,6 +35,7 @@ function Layout({ admin, onLogout, onAdminUpdate }) {
           <Routes>
             <Route path="/"              element={<Dashboard />} />
             <Route path="/detections"    element={<UAVDetections />} />
+            <Route path="/live"          element={<Live />} />
             <Route path="/map"           element={<FarmMap />} />
             <Route path="/farmers"       element={<Farmers />} />
             <Route path="/notifications" element={<Notifications />} />
