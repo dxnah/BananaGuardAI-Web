@@ -33,7 +33,7 @@ function Layout({ admin, onLogout, onAdminUpdate }) {
         <Navbar title={title} />
         <main className="flex-1 p-6">
           <Routes>
-            <Route path="/"              element={<Dashboard />} />
+            <Route path="/"              element={<Dashboard admin={admin} />} />
             <Route path="/detections"    element={<UAVDetections />} />
             <Route path="/live"          element={<Live />} />
             <Route path="/map"           element={<FarmMap />} />

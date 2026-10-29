@@ -21,6 +21,15 @@ api.interceptors.response.use(
   async (error) => {
     const original = error.config;
 
+    // FastAPI sends validation errors as a list; turn it into one readable sentence
+    const detail = error.response?.data?.detail;
+    if (Array.isArray(detail)) {
+      error.response.data.detail = detail
+        .map((d) => String(d.msg || "").replace(/^Value error, /, ""))
+        .filter(Boolean)
+        .join(". ") || "Please check the form and try again.";
+    }
+
     // if 401 and we haven't already retried
     if (error.response?.status === 401 && !original._retry) {
       original._retry = true;
@@ -29,7 +38,7 @@ api.interceptors.response.use(
       if (refreshToken) {
         try {
           const { data } = await axios.post(
-            `${import.meta.env.VITE_API_URL || "http://127.0.0.1:8000"}/auth/refresh`,
+            `${api.defaults.baseURL}/auth/refresh`,
             { refresh_token: refreshToken }
           );
           localStorage.setItem("token", data.access_token);
@@ -135,3 +144,13 @@ export const updateProfile = (payload) =>
 // payload: { current_password, new_password, confirm_password }
 export const changePassword = (payload) =>
   api.put("/auth/change-password", payload).then((r) => r.data);
+
+
+// ── App settings (notifications + farmer preferences) ─────────────────────────
+
+export const getSettings = () =>
+  api.get("/settings").then((r) => r.data);
+
+// payload: { auto_notify?, alert_threshold?, alert_cooldown_hours?, farmers_can_acknowledge? }
+export const updateSettings = (payload) =>
+  api.put("/settings", payload).then((r) => r.data);

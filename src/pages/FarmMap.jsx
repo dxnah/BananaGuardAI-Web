@@ -1,21 +1,61 @@
 import { useState } from "react";
+import { MapContainer, TileLayer, Polygon, Marker, Popup, useMap } from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 import StatusBadge from "../components/StatusBadge";
 import { farmers, detections } from "../data/mockData";
 import { MapPin, Calendar, Plane, User, X, AlertTriangle, ShieldCheck } from "lucide-react";
 
-const markerPositions = [
-  { farmer: 0, x: "23%", y: "30%" },
-  { farmer: 1, x: "55%", y: "22%" },
-  { farmer: 2, x: "30%", y: "62%" },
-  { farmer: 3, x: "65%", y: "58%" },
+// Fix default marker icon
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+});
+
+// Farm zone polygons — actual coords near Talakag, Bukidnon
+const zones = [
+  {
+    farmer: farmers[0],
+    coords: [[8.454, 124.631], [8.456, 124.631], [8.456, 124.633], [8.454, 124.633]],
+  },
+  {
+    farmer: farmers[1],
+    coords: [[8.460, 124.628], [8.462, 124.628], [8.462, 124.630], [8.460, 124.630]],
+  },
+  {
+    farmer: farmers[2],
+    coords: [[8.447, 124.635], [8.449, 124.635], [8.449, 124.637], [8.447, 124.637]],
+  },
+  {
+    farmer: farmers[3],
+    coords: [[8.452, 124.639], [8.454, 124.639], [8.454, 124.641], [8.452, 124.641]],
+  },
 ];
 
-const zoneColors = {
-  notified: { fill: "#FEF3DC", stroke: "#F4A522" },
-  resolved: { fill: "#F3F4F6", stroke: "#9CA3AF" },
-  no_alert: { fill: "#E9F5EE", stroke: "#1B4332" },
-  active:   { fill: "#FEF3DC", stroke: "#F4A522" },
+const zoneStyle = {
+  notified: { color: "#F4A522", fillColor: "#FEF3DC", fillOpacity: 0.6, weight: 2 },
+  resolved: { color: "#9CA3AF", fillColor: "#F3F4F6", fillOpacity: 0.6, weight: 2 },
+  no_alert: { color: "#1B4332", fillColor: "#E9F5EE", fillOpacity: 0.6, weight: 2 },
+  active:   { color: "#F4A522", fillColor: "#FEF3DC", fillOpacity: 0.6, weight: 2 },
 };
+
+// Custom colored marker
+function coloredIcon(color) {
+  return L.divIcon({
+    className: "",
+    html: `<div style="
+      width: 16px; height: 16px;
+      background: ${color};
+      border: 2px solid white;
+      border-radius: 50%;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+    "></div>`,
+    iconSize: [16, 16],
+    iconAnchor: [8, 8],
+  });
+}
 
 export default function FarmMap() {
   const [selected, setSelected] = useState(null);
@@ -24,9 +64,11 @@ export default function FarmMap() {
     ? detections.find((d) => d.farmerId === selected.id)
     : null;
 
+  const center = [8.452, 124.634];
+
   return (
     <div className="space-y-4">
-      {/* Header info */}
+      {/* Header */}
       <div className="bg-white border border-gray-200 rounded-xl px-5 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <MapPin size={15} className="text-forest" />
@@ -41,94 +83,47 @@ export default function FarmMap() {
 
       {/* Map + Side Panel */}
       <div className="flex gap-4">
-        {/* Map */}
+        {/* Leaflet Map */}
         <div className={`bg-white border border-gray-200 rounded-xl overflow-hidden transition-all ${selected ? "flex-1" : "w-full"}`}>
-          <div className="relative w-full h-[500px] bg-[#E9F5EE] overflow-hidden">
+          <div className="h-[500px] w-full">
+            <MapContainer
+              center={center}
+              zoom={15}
+              style={{ height: "100%", width: "100%" }}
+              scrollWheelZoom={true}
+            >
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a>'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
 
-            {/* Aerial background image */}
-            <img
-              src="/src/assets/farm-aerial.png"
-              alt="Aerial view of Talakag Banana Farm"
-              className="absolute inset-0 w-full h-full object-cover opacity-40"
-              onError={(e) => { e.target.style.display = "none"; }}
-            />
+              {zones.map(({ farmer, coords }) => {
+                const style = zoneStyle[farmer.status] || zoneStyle.no_alert;
+                const markerColor = style.color;
+                const centerLat = coords.reduce((s, c) => s + c[0], 0) / coords.length;
+                const centerLng = coords.reduce((s, c) => s + c[1], 0) / coords.length;
 
-            {/* Grid + Polygons SVG */}
-            <svg className="absolute inset-0 w-full h-full" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                  <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1B4332" strokeWidth="0.3" strokeOpacity="0.25" />
-                </pattern>
-              </defs>
-              <rect width="100%" height="100%" fill="url(#grid)" />
-
-              {/* Farm polygons */}
-              {[
-                { points: "80,80 200,70 210,160 90,170",     i: 0 },
-                { points: "280,60 420,55 425,150 285,155",   i: 1 },
-                { points: "100,240 240,235 245,340 105,345", i: 2 },
-                { points: "310,230 460,225 465,330 315,335", i: 3 },
-              ].map(({ points, i }) => {
-                const f = farmers[i];
-                const colors = zoneColors[f.status];
                 return (
-                  <polygon
-                    key={i}
-                    points={points}
-                    fill={colors.fill}
-                    fillOpacity="0.75"
-                    stroke={colors.stroke}
-                    strokeWidth="2"
-                  />
+                  <div key={farmer.id}>
+                    <Polygon
+                      positions={coords}
+                      pathOptions={style}
+                      eventHandlers={{ click: () => setSelected(farmer) }}
+                    />
+                    <Marker
+                      position={[centerLat, centerLng]}
+                      icon={coloredIcon(markerColor)}
+                      eventHandlers={{ click: () => setSelected(farmer) }}
+                    >
+                      <Popup>
+                        <div className="text-xs font-medium">{farmer.name}</div>
+                        <div className="text-xs text-gray-500">{farmer.coordinates}</div>
+                      </Popup>
+                    </Marker>
+                  </div>
                 );
               })}
-
-              {/* Zone labels */}
-              {[
-                { x: 145, y: 123, i: 0, label: "Caburatan" },
-                { x: 352, y: 105, i: 1, label: "Payot" },
-                { x: 172, y: 290, i: 2, label: "Soler" },
-                { x: 388, y: 280, i: 3, label: "Galinada" },
-              ].map(({ x, y, i, label }) => (
-                <text
-                  key={i}
-                  x={x} y={y}
-                  fontSize="11"
-                  fill="#1B4332"
-                  fontWeight="600"
-                  textAnchor="middle"
-                >
-                  {label}
-                </text>
-              ))}
-
-              {/* Coordinate labels */}
-              <text x="8" y="492" fontSize="9" fill="#1B4332" fillOpacity="0.5">8.44°N</text>
-              <text x="8" y="12"  fontSize="9" fill="#1B4332" fillOpacity="0.5">8.47°N</text>
-            </svg>
-
-            {/* Clickable Markers */}
-            {markerPositions.map(({ farmer: fi, x, y }) => {
-              const f = farmers[fi];
-              const isSelected = selected?.id === f.id;
-              const color = zoneColors[f.status].stroke;
-              return (
-                <button
-                  key={f.id}
-                  onClick={() => setSelected(isSelected ? null : f)}
-                  style={{ left: x, top: y, background: color }}
-                  className={`absolute w-5 h-5 rounded-full border-2 border-white shadow-md transform -translate-x-1/2 -translate-y-1/2 transition-all hover:scale-125 ${
-                    isSelected ? "scale-150 ring-2 ring-offset-1 ring-forest" : ""
-                  }`}
-                  title={f.name}
-                />
-              );
-            })}
-
-            {/* Image credit */}
-            <div className="absolute bottom-2 right-2 bg-black/30 text-white text-[9px] px-2 py-0.5 rounded">
-              Placeholder Image
-            </div>
+            </MapContainer>
           </div>
 
           {/* Legend */}
@@ -140,10 +135,7 @@ export default function FarmMap() {
               { color: "#9CA3AF", label: "Resolved" },
             ].map((l) => (
               <div key={l.label} className="flex items-center gap-1.5">
-                <div
-                  className="w-3 h-3 rounded-full border border-white shadow-sm"
-                  style={{ background: l.color }}
-                />
+                <div className="w-3 h-3 rounded-full border border-white shadow-sm" style={{ background: l.color }} />
                 <span className="text-xs text-gray-500">{l.label}</span>
               </div>
             ))}
@@ -153,7 +145,6 @@ export default function FarmMap() {
         {/* Side Panel */}
         {selected && (
           <div className="w-72 shrink-0 bg-white border border-gray-200 rounded-xl overflow-hidden h-fit">
-            {/* Panel Header */}
             <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between bg-forest-muted">
               <div className="flex items-center gap-2">
                 <MapPin size={14} className="text-forest" />
