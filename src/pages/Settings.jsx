@@ -4,11 +4,11 @@ import {
   User, Bell, Radio, Users, FileText, Shield,
   Save, Clock, AlertTriangle, CheckCircle, LogOut, RefreshCw, Copy, AlertCircle,
 } from "lucide-react";
-import  api, {
+import api, {
   updateProfile, changePassword, getSettings, updateSettings,
   getScans, getDetections, getAlerts, getFarmers,
 } from "../services/api";
-import { parseServerDate, formatDateTime } from "../utils/Dates";
+import { parseServerDate, formatDateTime } from "../utils/dates";
 import { SESSION_TIMEOUT_KEY } from "../hooks/useIdleLogout";
 
 const menu = [
@@ -339,7 +339,10 @@ export default function Settings({ admin, onLogout, onAdminUpdate }) {
       when: parseServerDate(a.alert_sent_at),
     }));
 
-    return list.sort((a, b) => (b.when?.getTime() ?? 0) - (a.when?.getTime() ?? 0));
+    // Newest first. When times are equal (a detection shares its scan's time), the later step goes first.
+    return list
+      .map((e, i) => ({ ...e, seq: i }))
+      .sort((a, b) => (b.when?.getTime() ?? 0) - (a.when?.getTime() ?? 0) || b.seq - a.seq);
   }, [activity]);
 
   const settingsReady = !settingsLoading && !settingsError && draft;
