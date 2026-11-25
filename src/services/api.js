@@ -154,3 +154,8 @@ export const getSettings = () =>
 // payload: { auto_notify?, alert_threshold?, alert_cooldown_hours?, farmers_can_acknowledge? }
 export const updateSettings = (payload) =>
   api.put("/settings", payload).then((r) => r.data);
+
+// ── Live drone stream (admin sets it, farmers watch it on mobile) ─────────────
+
+export const setLiveStream = (stream_url) =>
+  api.put("/stream", { stream_url }).then((r) => r.data);

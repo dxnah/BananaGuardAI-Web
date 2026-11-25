@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Camera, Leaf, Pause, Play, ShieldCheck, Wifi, AlertCircle } from "lucide-react";
-import { getDetections, getScans } from "../services/api";
+import { getDetections, getScans, setLiveStream } from "../services/api";
 import { parseServerDate } from "../utils/dates";
 
 const FEED_H = 420;
@@ -62,6 +62,7 @@ function DroneFeed() {
     }
     setFormError("");
     safeSet(STREAM_KEY, url);
+    setLiveStream(url).catch(() => setToast("Connected here, but farmers can't see it yet."));
     baselineRef.current = null;
     arrivedRef.current = {};
     setFlight([]);
@@ -74,6 +75,7 @@ function DroneFeed() {
   }
 
   function disconnect() {
+    setLiveStream(null).catch(() => {});
     setActiveUrl("");
     setStatus("idle");
     setPaused(false);
